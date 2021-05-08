@@ -1,0 +1,6 @@
+# API_KEY 申请地址https://www.acg-gov.com/account
+ACG_GOV_API_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJsaXVyYmFuZyIsInV1aWQiOiJkMDY4Y2Q3YzRiZmQ0YjEwYTlhZjZlZmM5MmJlN2ZkNiIsImlhdCI6MTU5OTMxMTc1MCwiYWNjb3VudCI6IntcImVtYWlsXCI6XCJsaXVyYmFuZ0BnbWFpbC5jb21cIixcImdlbmRlclwiOi0xLFwiaGFzUHJvblwiOjAsXCJpZFwiOjE1NCxcInBhc3NXb3JkXCI6XCJjODg0YWFjYzM3ZTczMmNjYjMwOGUwODE5YTgxM2JjYlwiLFwic3RhdHVzXCI6MCxcInVzZXJOYW1lXCI6XCJsaXVyYmFuZ1wifSIsImp0aSI6IjE1NCJ9.sHw1nrc_82vrz3Y-b1o6gYBN5-MCVbg8R9ywRaGG_IY"
+ACG_GOV_AMAZING_PIC_URL = "https://api.acgmx.com/public/setu"
+
+ACG_GOV_IMG_PATH = "/root/res/img/acggov"
+ACG_GOV_PIC_ORIGIN = False
