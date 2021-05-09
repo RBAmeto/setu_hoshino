@@ -5,7 +5,7 @@ import aiocqhttp
 import PIL.Image
 
 API = 'https://api.lolicon.app/setu/'
-APIKEY = '306754265f4f96e4d287a5'
+APIKEY = ''
 
 
 async def fetch_setu(keyword: str = ''):
