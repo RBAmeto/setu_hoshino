@@ -9,13 +9,11 @@ import io
 import base64
 import aiohttp
 import aiocqhttp
-from PIL import Image
 import PIL.Image
+import PIL.ImageDraw
 import hoshino
 from hoshino import Service, aiorequests
 from hoshino.config import NICKNAME
-from .util4acggov import Res as R
-from .util4acggov import download_async
 
 sv = Service('acggov', enable_on_default=True, help_='''ACGGOV涩图，多P时随机一张
 setu #随机涩图
@@ -61,14 +59,17 @@ async def fetch_image(url: str):
 async def get_image(url: str):
     im_bytes = await fetch_image(url)
     im = PIL.Image.open(io.BytesIO(im_bytes))
-
-    if im.mode in ('RGBA', 'LA'):
-        im_new = PIL.Image.new(im.mode[:-1], im.size)
-        im_new.paste(im, im.split()[-1])
-        im = im_new
+    if im.mode != 'RGB':
+        im = im.convert('RGB')
+    width, height = im.size
+    draw = PIL.ImageDraw.Draw(im)
+    draw.point((random.randint(1, width), random.randint(1, height)), fill=(random.randint(0, 255),
+			                                                                random.randint(0, 255),
+			                                                                random.randint(0, 255)))
     im_buffer = io.BytesIO()
     im.save(im_buffer, format='JPEG', quality=60)
-    im_base64 = base64.b64encode(im_buffer.getvalue())
+    im_value = im_buffer.getvalue()
+    im_base64 = base64.b64encode(im_value)
     return f'base64://{im_base64.decode("UTF-8")}'
 
 @sv.on_fullmatch({'setu'})
@@ -89,49 +90,25 @@ async def send_Amazing_Pic(bot, ev):
         suffix = None
         r = None
         img = None
-
-        if AcgGov.get_origin():
-            # 略微缩略图
-            req = urllib.request.Request(res['data']['large'], None, {"referer": "https://www.acgmx.com/"})
-            r = urllib.request.urlopen(req)
-            byte_stream = io.BytesIO(r.read())
-            roiImg = Image.open(byte_stream)
-            imgByteArr = io.BytesIO()
-            roiImg.save(imgByteArr, format='JPEG')
-            imgByteArr = imgByteArr.getvalue() + bytes("jneth", encoding="utf8")
-            # 拼接图片路径
-            path = AcgGov.get_path() + "/" + illust + ".jpg"
-            with open(path, "wb") as f:
-                f.write(imgByteArr)
-                print("done")
-                del r
-            await bot.send(ev, f'[CQ:at,qq={userId}][CQ:image,file={illust + ".jpg"}]')
-            os.remove(path)
-        else:
-            # 高清图
-            # 如果只有一页
-            resp1 = await aiorequests.get(f'https://api.acgmx.com/illusts/detail?illustId={illust}&reduction=true',
+        resp1 = await aiorequests.get(f'https://api.acgmx.com/illusts/detail?illustId={illust}&reduction=true',
                                      headers=headers, timeout=10, stream=True)
-
-            if resp1.status_code != 201:
-                await bot.send(ev, f'[CQ:at,qq={userId}]' + '您的请求频率过快，请一分钟后再试')
-                return
-            res1 = await resp1.json()
-            page_count = res1['data']['illust']['page_count']
-            title = res1['data']['illust']['title']
-
-            uri = None
-            if page_count == 1:
-                uri = res1['data']['illust']['meta_single_page']['original_image_url'].replace("https://i.pximg.net", "https://i.pixiv.cat")
-            else:
-                meta_pages = res1['data']['illust']['meta_pages']
-                num = random.randint(1, len(meta_pages))
-                uri = meta_pages[num-1]['image_urls']['original'].replace("https://i.pximg.net", "https://i.pixiv.cat")
-            print(uri)
-            pathc = AcgGov.get_path()
-            setu_path = await download_async(uri, pathc, illust)
-            setu = R.image(f'{setu_path}')
-            await bot.send(ev, f'[CQ:at,qq={userId}]{setu}\nid:{illust}\ntitle:{title}')
+        if resp1.status_code != 201:
+            await bot.send(ev, f'[CQ:at,qq={userId}]' + '您的请求频率过快，请一分钟后再试')
+            return
+        res1 = await resp1.json()
+        page_count = res1['data']['illust']['page_count']
+        title = res1['data']['illust']['title']
+        uri = None
+        if page_count == 1:
+            uri = res1['data']['illust']['meta_single_page']['original_image_url'].replace("https://i.pximg.net", "https://i.pixiv.cat")
+        else:
+            meta_pages = res1['data']['illust']['meta_pages']
+            num = random.randint(1, len(meta_pages))
+            uri = meta_pages[num-1]['image_urls']['original'].replace("https://i.pximg.net", "https://i.pixiv.cat")
+        print(uri)
+        im_base64 = await get_image(uri)
+        setu = aiocqhttp.message.MessageSegment.image(im_base64)
+        await bot.send(ev, f'[CQ:at,qq={userId}]{setu}\nid:{illust}\ntitle:{title}')
     except Exception as e:
             sv.logger.error(f'Error: {e}')
 
@@ -240,8 +217,8 @@ async def ranking(bot, ev):
             pid1 = i['work']['id']
             pid = f'preview{pid1}'
             urld = i['work']['image_urls']['px_128x128'].replace("https://i.pximg.net", "https://i.pixiv.cat").replace("128x128", "150x150")
-            yulan_path = await download_async(urld, pathc, pid)
-            yulan = R.image(f'{yulan_path}')
+            im_base64 = await get_image(urld)
+            yulan = aiocqhttp.message.MessageSegment.image(im_base64)
             message += f'{num}、' + i['work']['title'] + '-' + str(i['work']['user']['name']) + '\n' + f'{yulan}' + '\n'
             num += 1
         message += f'=======第{current}页，共{str(pages)}页======='
@@ -358,9 +335,8 @@ async def look_ranking(bot, ev):
             num = random.randint(1, len(meta_pages))
             uri = meta_pages[num-1]['image_urls']['original'].replace("https://i.pximg.net", "https://i.pixiv.cat")
         print(uri)
-        pathc = AcgGov.get_path()
-        setu_path = await download_async(uri, pathc, illust)
-        setu = R.image(f'{setu_path}')
+        im_base64 = await get_image(uri)
+        setu = aiocqhttp.message.MessageSegment.image(im_base64)
         await bot.send(ev, f'[CQ:at,qq={userId}]{setu}\nid:{illust}\ntitle:{title}\n画师:{author}')
     except Exception as e:
         sv.logger.error(f'Error: {e}')
@@ -394,9 +370,8 @@ async def pidchatu(bot, ev):
                 num = random.randint(1, len(meta_pages))
                 uri = meta_pages[num-1]['image_urls']['original'].replace("https://i.pximg.net", "https://i.pixiv.cat")
             print(uri)
-            pathc = AcgGov.get_path()
-            setu_path = await download_async(uri, pathc, illust)
-            setu = R.image(f'{setu_path}')
+            im_base64 = await get_image(uri)
+            setu = aiocqhttp.message.MessageSegment.image(im_base64)
             await bot.send(ev, f'[CQ:at,qq={userId}]{setu}\nid:{illust}\ntitle:{title}\n画师:{author}')
     except Exception as e:
             sv.logger.error(f'Error: {e}')
@@ -427,9 +402,8 @@ async def sosetu(bot, ev):
                 num = random.randint(1, len(meta_pages))
                 uri = meta_pages[num-1]['image_urls']['original'].replace("https://i.pximg.net", "https://i.pixiv.cat")
             print(uri)
-            pathc = AcgGov.get_path()
-            setu_path = await download_async(uri, pathc, illust)
-            setu = R.image(f'{setu_path}')
+            im_base64 = await get_image(uri)
+            setu = aiocqhttp.message.MessageSegment.image(im_base64)
             await bot.send(ev, f'[CQ:at,qq={userId}]{setu}\nid:{illust}\ntitle:{title}\n画师:{author}')
         else:
             await bot.send(ev, f'搜图姬待命中...')
